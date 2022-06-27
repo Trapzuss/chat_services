@@ -1,24 +1,27 @@
 const mongoose = require("mongoose");
 const messageSchema = new mongoose.Schema({
-  // UserModel user;
-  // String lastMessage;
-  // String lastTime;
-  // bool isContinue;
-  user: {
-    type: Object,
-    required: true,
-  },
-  lastMessage: {
+  userId: {
     type: String,
     required: true,
   },
-  lastTime: {
+  messageText: {
     type: String,
     required: true,
   },
-  isContinue: {
-    type: Boolean,
-    required: true,
+  messageType: {
+    default: "DEFAULT_MESSAGE",
+    enum: [
+      "DEFAULT_MESSAGE",
+      "CONFIRM_ADOPT",
+      "REQUEST_ADOPT",
+      "CANCEL_REQUEST_ADOPT",
+      "REJECT_ADOPT",
+    ],
+    type: String,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now(),
   },
 });
 
