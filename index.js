@@ -7,7 +7,7 @@ const postsModel = require("./models/posts");
 const usersModel = require("./models/users");
 const app = express();
 const cors = require("cors");
-const port = 4000;
+const port = 4000 || process.env.PORT;
 const uuid = require("uuid");
 const bodyParser = require("body-parser");
 mongoose
@@ -18,7 +18,7 @@ mongoose
   .catch((error) => console.log(error));
 
 const server = app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
+  console.log(`Chat services app listening on port ${port}`);
 });
 const io = require("socket.io")(server, {
   cors: {
@@ -42,26 +42,6 @@ app.post("/", async (req, res) => {
   res.send("ok");
 });
 
-// io.on("connection", async (socket) => {
-//   socket.on("chatId", (data) => {
-//     console.log(`${socket.id} entering to the room: ${data.chatId}`);
-//     socket.join(data.chatId);
-//     io.to(data.chatId).emit("received", data.text);
-//   });
-
-//   socket.on("message", (data) => {
-//     console.log(data);
-//     socket.join(data.chatId);
-//     io.to(data.chatId).emit("received", data.text);
-//   });
-
-//   socket.on("disconnecting", () => {
-//     console.log(socket.rooms); // the Set contains at least the socket ID
-//   });
-
-//   socket.on("disconnect", () => {});
-// });
-
 io.on("connection", async (socket) => {
   console.log("Connected by", socket.id);
   // socket.on("join", (data) => {
@@ -69,33 +49,23 @@ io.on("connection", async (socket) => {
   // });
 
   socket.on("chatId", async (data) => {
-    console.log(`Entering chatId ${data.chatId} : ByUserId ${data.byUserId}`);
     if (data?.chatId != null) {
       socket.join(data.chatId);
+      console.log(`[${data.chatId}] has joined by ${data.byUserId}`);
       let chat = await chatsModel.findOne({ _id: data.chatId }).exec();
-      let toUserId = chat?.participants.map((userId) => {
-        if (userId != data.byUserId) {
-          return userId;
-        }
-      });
-
-      let toUser = await usersModel.findOne({ _id: toUserId }, { password: 0 });
       let payload = {
-        chat,
-        toUser,
+        chat: chat,
       };
 
-      socket.to(data.chatId).emit("received-messages", payload);
-      socket.emit("received-messages", payload);
+      // broadcast in that room
+      io.to(data.chatId).emit("received-messages", payload);
+    } else {
+      socket.emit("received-messages", "Entering the empty room");
+      console.log(`${data.byUserId} Entering the empty room`);
     }
   });
 
-  socket.on("disconnect", () => {
-    console.log("Disconnected", socket.id);
-  });
-
   socket.on("createMessage", async (msg) => {
-    // console.log(msg);
     const newMessage = {
       postId: msg.postId,
       chatId: msg.chatId,
@@ -105,7 +75,7 @@ io.on("connection", async (socket) => {
       messageType:
         msg.messageType == null ? "DEFAULT_MESSAGE" : msg.messageType,
     };
-    // console.log(newMessage);
+
     let chat;
     if (newMessage.chatId == null) {
       let response = await chatsModel.create({
@@ -120,7 +90,6 @@ io.on("connection", async (socket) => {
         ],
       });
       newMessage.chatId = response._id;
-      // chat = await chatsModel.findOne({ _id: response._id });
     } else {
       await chatsModel.updateOne(
         {
@@ -137,7 +106,6 @@ io.on("connection", async (socket) => {
           },
         }
       );
-      // chat = await chatsModel.findOne({ _id: newMessage.chatId });
     }
     socket.join(newMessage.chatId);
     if (newMessage.messageType != "DEFAULT_MESSAGE") {
@@ -189,19 +157,16 @@ io.on("connection", async (socket) => {
       }
     );
 
-    let toUser = await usersModel.findOne(
-      { _id: newMessage.toUserId },
-      { password: 0 }
-    );
     chat = await chatsModel.findOne({ _id: newMessage.chatId });
     let payload = {
-      chat,
-      toUser,
+      chat: chat,
     };
-    // console.log(payload);
-    // io.emit("received-messages", payload);
-    socket.to(newMessage.chatId).emit("received-messages", payload);
-    socket.emit("received-messages", payload);
-    // console.log("emit received-messages");
+
+    console.log(`[${newMessage?.chatId}]: send by ${newMessage.byUserId}`);
+    io.to(newMessage.chatId).emit("received-messages", payload);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Disconnected", socket.id);
   });
 });
