@@ -86,6 +86,7 @@ io.on("connection", async (socket) => {
             userId: newMessage.byUserId,
             messageText: newMessage.messageText,
             messageType: newMessage.messageType,
+            createdAt: Date.now(),
           },
         ],
       });
@@ -102,6 +103,7 @@ io.on("connection", async (socket) => {
               userId: newMessage.byUserId,
               messageText: newMessage.messageText,
               messageType: newMessage.messageType,
+              createdAt: Date.now(),
             },
           },
         }
